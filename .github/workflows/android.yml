@@ -2,9 +2,15 @@ name: Build APK
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'app/src/main/assets/index.html'
+    inputs:
+      app_name:
+        description: 'App Name'
+        required: true
+        default: 'MyApp'
+      package_name:
+        description: 'Package Name'
+        required: true
+        default: 'com.example.myapp'
 
 jobs:
   build:
@@ -19,14 +25,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Update App Name and Package Name
+        run: |
+          # Update app name in strings.xml
+          sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">${{ github.event.inputs.app_name }}<\/string>/" app/src/main/res/values/strings.xml
+          
+          # Update package name in build.gradle
+          sed -i "s/applicationId .*/applicationId '${{ github.event.inputs.package_name }}'/" app/build.gradle
+          
+          # Update namespace in build.gradle
+          sed -i "s/namespace .*/namespace '${{ github.event.inputs.package_name }}'/" app/build.gradle
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
       - name: Build APK
         run: ./gradlew assembleDebug
 
+      - name: Rename APK with App Name
+        run: |
+          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/${{ github.event.inputs.app_name }}.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ${{ github.event.inputs.app_name }}-APK
+          path: app/build/outputs/apk/debug/${{ github.event.inputs.app_name }}.apk
