@@ -7,10 +7,12 @@ on:
         description: 'App Name'
         required: true
         default: 'MyApp'
+        type: string
       package_name:
         description: 'Package Name'
         required: true
         default: 'com.example.myapp'
+        type: string
 
 jobs:
   build:
@@ -25,16 +27,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Update App Name and Package Name
+      - name: Display inputs
         run: |
-          # Update app name in strings.xml
-          sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">${{ github.event.inputs.app_name }}<\/string>/" app/src/main/res/values/strings.xml
-          
-          # Update package name in build.gradle
-          sed -i "s/applicationId .*/applicationId '${{ github.event.inputs.package_name }}'/" app/build.gradle
-          
-          # Update namespace in build.gradle
-          sed -i "s/namespace .*/namespace '${{ github.event.inputs.package_name }}'/" app/build.gradle
+          echo "App Name: ${{ github.event.inputs.app_name }}"
+          echo "Package Name: ${{ github.event.inputs.package_name }}"
+
+      - name: Update app name in strings.xml
+        run: |
+          if [ -f "app/src/main/res/values/strings.xml" ]; then
+            sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">${{ github.event.inputs.app_name }}<\/string>/" app/src/main/res/values/strings.xml
+            echo "✅ Updated app name in strings.xml"
+          else
+            echo "⚠️ strings.xml not found"
+          fi
+
+      - name: Update package name in build.gradle
+        run: |
+          if [ -f "app/build.gradle" ]; then
+            sed -i "s/applicationId .*/applicationId '${{ github.event.inputs.package_name }}'/" app/build.gradle
+            sed -i "s/namespace .*/namespace '${{ github.event.inputs.package_name }}'/" app/build.gradle
+            echo "✅ Updated package name in build.gradle"
+          else
+            echo "⚠️ build.gradle not found"
+          fi
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -44,10 +59,16 @@ jobs:
 
       - name: Rename APK with App Name
         run: |
-          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/${{ github.event.inputs.app_name }}.apk
+          if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/${{ github.event.inputs.app_name }}.apk
+            echo "✅ Renamed APK to ${{ github.event.inputs.app_name }}.apk"
+          else
+            echo "⚠️ APK file not found"
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.inputs.app_name }}-APK
           path: app/build/outputs/apk/debug/${{ github.event.inputs.app_name }}.apk
+          if-no-files-found: warn
